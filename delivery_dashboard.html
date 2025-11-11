@@ -1,0 +1,548 @@
+{% extends "base.html" %}
+
+{% block title %}Delivery Dashboard - SwiftServe{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-12">
+        <h2 class="mb-4">
+            <i class="fas fa-motorcycle"></i> Delivery Dashboard
+        </h2>
+        
+        <!-- Status Toggle -->
+        <div class="card mb-4">
+            <div class="card-body">
+                <div class="row align-items-center">
+                    <div class="col-md-6">
+                        <h5 class="mb-0">Delivery Status</h5>
+                        <p class="text-muted mb-0">Toggle your availability for delivery assignments</p>
+                    </div>
+                    <div class="col-md-6 text-md-end">
+                        <div class="form-check form-switch form-check-reverse">
+                            <input class="form-check-input" type="checkbox" id="deliveryStatus" 
+                                   {% if agent.is_available %}checked{% endif %}
+                                   onchange="toggleDeliveryStatus()">
+                            <label class="form-check-label" for="deliveryStatus">
+                                <span id="statusText" class="fw-bold {% if agent.is_available %}text-success{% else %}text-danger{% endif %}">
+                                    {% if agent.is_available %}Available for Deliveries{% else %}Offline{% endif %}
+                                </span>
+                            </label>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Stats Cards -->
+        <div class="row mb-4">
+            <div class="col-md-3">
+                <div class="card bg-info text-white">
+                    <div class="card-body text-center">
+                        <i class="fas fa-clock fa-2x mb-2"></i>
+                        <h5>{{ orders|selectattr('status', 'equalto', 'ready_for_pickup')|list|length }}</h5>
+                        <p class="mb-0">Ready for Pickup</p>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="card bg-warning text-white">
+                    <div class="card-body text-center">
+                        <i class="fas fa-motorcycle fa-2x mb-2"></i>
+                        <h5>{{ orders|selectattr('status', 'equalto', 'picked_up')|list|length }}</h5>
+                        <p class="mb-0">In Transit</p>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="card bg-success text-white">
+                    <div class="card-body text-center">
+                        <i class="fas fa-check-circle fa-2x mb-2"></i>
+                        <h5>{{ orders|selectattr('status', 'equalto', 'delivered')|list|length }}</h5>
+                        <p class="mb-0">Delivered Today</p>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="card bg-primary text-white">
+                    <div class="card-body text-center">
+                        <i class="fas fa-dollar-sign fa-2x mb-2"></i>
+                        <h5>${{ "%.2f"|format(earnings or 0) }}</h5>
+                        <p class="mb-0">Today's Earnings</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Available Orders -->
+        <div class="card mb-4">
+            <div class="card-header">
+                <h5 class="mb-0">
+                    <i class="fas fa-shopping-bag"></i> Available Orders for Pickup
+                </h5>
+            </div>
+            <div class="card-body">
+                {% set ready_orders = orders|selectattr('status', 'equalto', 'ready_for_pickup')|list %}
+                {% if ready_orders %}
+                    <div class="row">
+                        {% for order in ready_orders %}
+                            <div class="col-md-6 mb-3">
+                                <div class="card border-primary">
+                                    <div class="card-body">
+                                        <div class="d-flex justify-content-between align-items-start mb-2">
+                                            <h6 class="mb-0">Order #{{ order.id }}</h6>
+                                            <span class="badge bg-primary">${{ "%.2f"|format(order.total_amount) }}</span>
+                                        </div>
+                                        <p class="mb-1">
+                                            <i class="fas fa-store"></i> 
+                                            <strong>{{ order.restaurant.name }}</strong>
+                                        </p>
+                                        <p class="mb-1">
+                                            <i class="fas fa-map-marker-alt"></i> 
+                                            {{ order.delivery_address }}
+                                        </p>
+                                        <p class="mb-2">
+                                            <i class="fas fa-clock"></i> 
+                                            Ready since: {{ order.timestamp.strftime('%H:%M') }}
+                                        </p>
+                                        <div class="d-grid">
+                                            <button class="btn btn-primary" onclick="acceptDelivery({{ order.id }})">
+                                                <i class="fas fa-check"></i> Accept Delivery
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        {% endfor %}
+                    </div>
+                {% else %}
+                    <div class="text-center py-4">
+                        <i class="fas fa-motorcycle fa-3x text-muted mb-3"></i>
+                        <h5 class="text-muted">No orders available</h5>
+                        <p class="text-muted">Orders ready for pickup will appear here.</p>
+                    </div>
+                {% endif %}
+            </div>
+        </div>
+        
+        <!-- Current Delivery -->
+        {% set current_orders = orders|selectattr('status', 'in', ['picked_up', 'in_transit'])|list %}
+        {% if current_orders %}
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h5 class="mb-0">
+                        <i class="fas fa-route"></i> Current Delivery
+                    </h5>
+                </div>
+                <div class="card-body">
+                    {% for order in current_orders %}
+                        <div class="border rounded p-3 mb-3">
+                            <div class="row align-items-center">
+                                <div class="col-md-6">
+                                    <h6 class="mb-1">Order #{{ order.id }}</h6>
+                                    <p class="mb-1">
+                                        <i class="fas fa-store"></i> 
+                                        <strong>{{ order.restaurant.name }}</strong>
+                                    </p>
+                                    <p class="mb-1">
+                                        <i class="fas fa-user"></i> 
+                                        {{ order.customer.name }}
+                                    </p>
+                                    <p class="mb-2">
+                                        <i class="fas fa-map-marker-alt"></i> 
+                                        {{ order.delivery_address }}
+                                    </p>
+                                    <span class="badge bg-warning">Status: {{ order.get_status_display() }}</span>
+                                </div>
+                                <div class="col-md-6 text-md-end">
+                                    <div class="mb-2">
+                                        <button class="btn btn-info btn-sm" onclick="viewOnMap({{ order.id }})">
+                                            <i class="fas fa-map"></i> View on Map
+                                        </button>
+                                    </div>
+                                    {% if order.status == 'picked_up' %}
+                                        <button class="btn btn-primary" onclick="startDelivery({{ order.id }})">
+                                            <i class="fas fa-play"></i> Start Delivery
+                                        </button>
+                                    {% elif order.status == 'in_transit' %}
+                                        <button class="btn btn-success" onclick="completeDelivery({{ order.id }})">
+                                            <i class="fas fa-check"></i> Mark as Delivered
+                                        </button>
+                                    {% endif %}
+                                </div>
+                            </div>
+                        </div>
+                    {% endfor %}
+                </div>
+            </div>
+        {% endif %}
+        
+        <!-- Recent Deliveries -->
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0">
+                    <i class="fas fa-history"></i> Recent Deliveries
+                </h5>
+            </div>
+            <div class="card-body">
+                {% set recent_delivered = orders|selectattr('status', 'equalto', 'delivered')|list %}
+                {% if recent_delivered %}
+                    <div class="table-responsive">
+                        <table class="table table-hover">
+                            <thead>
+                                <tr>
+                                    <th>Order ID</th>
+                                    <th>Restaurant</th>
+                                    <th>Customer</th>
+                                    <th>Amount</th>
+                                    <th>Status</th>
+                                    <th>Time</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for order in recent_delivered|reverse %}
+                                    {% if loop.index <= 10 %}
+                                        <tr>
+                                            <td>#{{ order.id }}</td>
+                                            <td>{{ order.restaurant.name }}</td>
+                                            <td>{{ order.customer.name }}</td>
+                                            <td>${{ "%.2f"|format(order.total_amount) }}</td>
+                                            <td>
+                                                <span class="badge bg-success">Delivered</span>
+                                            </td>
+                                            <td>{{ order.timestamp.strftime('%H:%M') }}</td>
+                                        </tr>
+                                    {% endif %}
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                {% else %}
+                    <div class="text-center py-4">
+                        <i class="fas fa-history fa-3x text-muted mb-3"></i>
+                        <h5 class="text-muted">No recent deliveries</h5>
+                        <p class="text-muted">Your completed deliveries will appear here.</p>
+                    </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Map Modal -->
+<div class="modal fade" id="mapModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">
+                    <i class="fas fa-map"></i> Delivery Route
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div id="deliveryMap" style="height: 400px; border-radius: 8px;"></div>
+                <div class="mt-3" id="deliveryInstructions">
+                    <h6>Delivery Instructions:</h6>
+                    <p id="instructionsText"></p>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                <button type="button" class="btn btn-primary" onclick="getDirections()">
+                    <i class="fas fa-directions"></i> Get Directions
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script>
+let socket;
+let deliveryMap;
+let currentOrderId;
+
+// Initialize Socket.IO connection
+document.addEventListener('DOMContentLoaded', function() {
+    socket = io();
+    
+    // Join delivery agent room for real-time updates
+    socket.emit('join_delivery_room', {
+        agent_id: {{ agent.id }}
+    });
+    
+    // Listen for new delivery assignments
+    socket.on('new_delivery_assignment', function(data) {
+        showToast(`New delivery assignment: Order #${data.order_id} from ${data.restaurant_name}`, 'info');
+        // Reload page to show new assignment
+        setTimeout(() => location.reload(), 2000);
+    });
+    
+    // Listen for order status updates
+    socket.on('order_status_updated', function(data) {
+        if (data.agent_id === {{ agent.id }}) {
+            showToast(`Order #${data.order_id} status updated to ${data.status}`, 'info');
+            setTimeout(() => location.reload(), 1000);
+        }
+    });
+    
+    // Listen for location updates from restaurant
+    socket.on('restaurant_location_update', function(data) {
+        if (currentOrderId && data.order_id === currentOrderId) {
+            updateMapWithNewLocation(data.lat, data.lng, 'Restaurant');
+        }
+    });
+});
+
+function toggleDeliveryStatus() {
+    const status = document.getElementById('deliveryStatus').checked;
+    const statusText = document.getElementById('statusText');
+    
+    fetch('/api/delivery/agent/toggle_status', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+            is_available: status
+        })
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            statusText.textContent = status ? 'Available for Deliveries' : 'Offline';
+            statusText.className = `fw-bold ${status ? 'text-success' : 'text-danger'}`;
+            showToast(`Status updated to ${status ? 'available' : 'offline'}`, 'success');
+        } else {
+            showToast('Failed to update status', 'error');
+            document.getElementById('deliveryStatus').checked = !status;
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        showToast('Error updating status', 'error');
+        document.getElementById('deliveryStatus').checked = !status;
+    });
+}
+
+function acceptDelivery(orderId) {
+    if (confirm('Are you sure you want to accept this delivery?')) {
+        fetch('/api/delivery/accept', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+                order_id: orderId
+            })
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                showToast('Delivery accepted successfully!', 'success');
+                setTimeout(() => location.reload(), 1500);
+            } else {
+                showToast('Failed to accept delivery', 'error');
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            showToast('Error accepting delivery', 'error');
+        });
+    }
+}
+
+function startDelivery(orderId) {
+    if (confirm('Are you sure you want to start this delivery?')) {
+        fetch('/api/delivery/start', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+                order_id: orderId
+            })
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                showToast('Delivery started!', 'success');
+                setTimeout(() => location.reload(), 1500);
+            } else {
+                showToast('Failed to start delivery', 'error');
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            showToast('Error starting delivery', 'error');
+        });
+    }
+}
+
+function completeDelivery(orderId) {
+    if (confirm('Are you sure you want to mark this delivery as complete?')) {
+        fetch('/api/delivery/complete', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+                order_id: orderId
+            })
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                showToast('Delivery completed successfully!', 'success');
+                setTimeout(() => location.reload(), 1500);
+            } else {
+                showToast('Failed to complete delivery', 'error');
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            showToast('Error completing delivery', 'error');
+        });
+    }
+}
+
+function viewOnMap(orderId) {
+    currentOrderId = orderId;
+    
+    // Show map modal
+    const mapModal = new bootstrap.Modal(document.getElementById('mapModal'));
+    mapModal.show();
+    
+    // Initialize map after modal is shown
+    setTimeout(() => {
+        initializeDeliveryMap(orderId);
+    }, 500);
+}
+
+function initializeDeliveryMap(orderId) {
+    // Initialize map
+    deliveryMap = L.map('deliveryMap').setView([40.7128, -74.0060], 13);
+    
+    // Add tile layer
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        attribution: '© OpenStreetMap contributors'
+    }).addTo(deliveryMap);
+    
+    // Mock restaurant and customer locations for demo
+    const restaurantLocation = [40.7128, -74.0060];
+    const customerLocation = [40.7200, -74.0100];
+    
+    // Add restaurant marker
+    L.marker(restaurantLocation)
+        .addTo(deliveryMap)
+        .bindPopup('<b>Restaurant</b><br>Pickup location')
+        .openPopup();
+    
+    // Add customer marker
+    L.marker(customerLocation)
+        .addTo(deliveryMap)
+        .bindPopup('<b>Customer</b><br>Delivery location');
+    
+    // Add route line
+    const routeCoordinates = [restaurantLocation, customerLocation];
+    L.polyline(routeCoordinates, {
+        color: 'blue',
+        weight: 4,
+        opacity: 0.7
+    }).addTo(deliveryMap);
+    
+    // Fit map to show both markers
+    const group = new L.featureGroup([L.marker(restaurantLocation), L.marker(customerLocation)]);
+    deliveryMap.fitBounds(group.getBounds().pad(0.1));
+    
+    // Update instructions
+    document.getElementById('instructionsText').textContent = 
+        'Pickup from restaurant and deliver to customer location. Distance: ~1.2 miles';
+    
+    // Get current location if available
+    if (navigator.geolocation) {
+        navigator.geolocation.getCurrentPosition(function(position) {
+            const currentLocation = [position.coords.latitude, position.coords.longitude];
+            L.marker(currentLocation)
+                .addTo(deliveryMap)
+                .bindPopup('<b>Your Location</b>')
+                .openPopup();
+        });
+    }
+}
+
+function updateMapWithNewLocation(lat, lng, label) {
+    if (deliveryMap) {
+        L.marker([lat, lng])
+            .addTo(deliveryMap)
+            .bindPopup(`<b>${label}</b>`)
+            .openPopup();
+    }
+}
+
+function getDirections() {
+    // Open Google Maps with directions
+    window.open('https://maps.google.com/?q=restaurant+location', '_blank');
+}
+
+function showToast(message, type = 'info') {
+    const toastHTML = `
+        <div class="toast align-items-center text-white bg-${type === 'success' ? 'success' : type === 'error' ? 'danger' : 'info'} border-0" role="alert">
+            <div class="d-flex">
+                <div class="toast-body">
+                    ${message}
+                </div>
+                <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast"></button>
+            </div>
+        </div>
+    `;
+    
+    const toastContainer = document.createElement('div');
+    toastContainer.className = 'toast-container position-fixed top-0 end-0 p-3';
+    toastContainer.innerHTML = toastHTML;
+    document.body.appendChild(toastContainer);
+    
+    const toast = new bootstrap.Toast(toastContainer.querySelector('.toast'));
+    toast.show();
+    
+    setTimeout(() => {
+        document.body.removeChild(toastContainer);
+    }, 3000);
+}
+
+// Clean up map when modal is closed
+document.getElementById('mapModal').addEventListener('hidden.bs.modal', function () {
+    if (deliveryMap) {
+        deliveryMap.remove();
+        deliveryMap = null;
+    }
+});
+</script>
+
+{% endblock %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+<style>
+.card {
+    transition: transform 0.3s ease;
+}
+
+.card:hover {
+    transform: translateY(-2px);
+}
+
+.form-switch .form-check-input {
+    transform: scale(1.5);
+}
+
+.btn-group-sm .btn {
+    margin-right: 0.25rem;
+}
+
+#deliveryMap {
+    border: 2px solid #dee2e6;
+}
+</style>
+{% endblock %}

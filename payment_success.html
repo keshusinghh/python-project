@@ -1,0 +1,218 @@
+{% extends "base.html" %}
+
+{% block title %}Payment Successful - SwiftServe{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-md-8 col-lg-6">
+        <div class="card shadow-lg">
+            <div class="card-body text-center py-5">
+                <!-- Success Icon -->
+                <div class="mb-4">
+                    <div class="success-icon">
+                        <i class="fas fa-check-circle"></i>
+                    </div>
+                </div>
+                
+                <h2 class="text-success mb-3">Payment Successful!</h2>
+                <p class="text-muted mb-4">
+                    Your order has been placed successfully and is being processed.
+                </p>
+                
+                <!-- Order Summary -->
+                <div class="order-summary mb-4">
+                    <h5 class="mb-3">Order Summary</h5>
+                    <div class="row text-start">
+                        <div class="col-6">
+                            <p class="mb-1"><strong>Order ID:</strong></p>
+                            <p class="mb-1"><strong>Restaurant:</strong></p>
+                            <p class="mb-1"><strong>Total Amount:</strong></p>
+                            <p class="mb-1"><strong>Delivery Address:</strong></p>
+                        </div>
+                        <div class="col-6">
+                            <p class="mb-1">#{{ order.id }}</p>
+                            <p class="mb-1">{{ order.restaurant.name }}</p>
+                            <p class="mb-1">${{ "%.2f"|format(order.total_amount) }}</p>
+                            <p class="mb-1">{{ order.delivery_address }}</p>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Estimated Delivery Time -->
+                <div class="alert alert-info mb-4">
+                    <i class="fas fa-clock"></i>
+                    <strong>Estimated Delivery Time:</strong> 25-35 minutes
+                </div>
+                
+                <!-- Action Buttons -->
+                <div class="d-grid gap-2">
+                    <a href="/track/{{ order.id }}" class="btn btn-primary btn-lg">
+                        <i class="fas fa-map-marker-alt"></i> Track Your Order
+                    </a>
+                    <a href="/dashboard" class="btn btn-outline-secondary">
+                        <i class="fas fa-home"></i> Back to Dashboard
+                    </a>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Next Steps -->
+        <div class="card mt-4">
+            <div class="card-body">
+                <h6 class="mb-3">What happens next?</h6>
+                <div class="timeline-steps">
+                    <div class="timeline-step">
+                        <div class="timeline-icon">
+                            <i class="fas fa-check-circle text-success"></i>
+                        </div>
+                        <div class="timeline-content">
+                            <h6>Order Confirmed</h6>
+                            <p class="text-muted small mb-0">Your payment has been processed successfully</p>
+                        </div>
+                    </div>
+                    <div class="timeline-step">
+                        <div class="timeline-icon">
+                            <i class="fas fa-fire text-warning"></i>
+                        </div>
+                        <div class="timeline-content">
+                            <h6>Preparing Your Order</h6>
+                            <p class="text-muted small mb-0">The restaurant is preparing your food</p>
+                        </div>
+                    </div>
+                    <div class="timeline-step">
+                        <div class="timeline-icon">
+                            <i class="fas fa-motorcycle text-info"></i>
+                        </div>
+                        <div class="timeline-content">
+                            <h6>Out for Delivery</h6>
+                            <p class="text-muted small mb-0">A delivery agent will pick up and deliver your order</p>
+                        </div>
+                    </div>
+                    <div class="timeline-step">
+                        <div class="timeline-icon">
+                            <i class="fas fa-home text-success"></i>
+                        </div>
+                        <div class="timeline-content">
+                            <h6>Delivered</h6>
+                            <p class="text-muted small mb-0">Enjoy your meal!</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Auto-redirect after 10 seconds -->
+<script>
+setTimeout(function() {
+    window.location.href = '/track/{{ order.id }}';
+}, 10000);
+
+// Show countdown
+let countdown = 10;
+const countdownElement = document.createElement('div');
+countdownElement.className = 'text-center mt-3 text-muted';
+countdownElement.innerHTML = `Redirecting to order tracking in <span id="countdown">${countdown}</span> seconds...`;
+document.querySelector('.card-body').appendChild(countdownElement);
+
+const countdownInterval = setInterval(function() {
+    countdown--;
+    document.getElementById('countdown').textContent = countdown;
+    if (countdown <= 0) {
+        clearInterval(countdownInterval);
+    }
+}, 1000);
+</script>
+{% endblock %}
+
+{% block extra_css %}
+<style>
+.success-icon {
+    font-size: 80px;
+    color: #28a745;
+    animation: bounce 1s ease-in-out;
+}
+
+@keyframes bounce {
+    0%, 20%, 50%, 80%, 100% {
+        transform: translateY(0);
+    }
+    40% {
+        transform: translateY(-20px);
+    }
+    60% {
+        transform: translateY(-10px);
+    }
+}
+
+.order-summary {
+    background-color: #f8f9fa;
+    padding: 20px;
+    border-radius: 8px;
+    border-left: 4px solid #007bff;
+}
+
+.timeline-steps {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    margin-top: 20px;
+}
+
+.timeline-step {
+    flex: 1;
+    text-align: center;
+    position: relative;
+}
+
+.timeline-step:not(:last-child)::after {
+    content: '';
+    position: absolute;
+    top: 20px;
+    left: 50%;
+    width: 100%;
+    height: 2px;
+    background: #e9ecef;
+    z-index: 1;
+}
+
+.timeline-icon {
+    width: 40px;
+    height: 40px;
+    background: white;
+    border: 2px solid #e9ecef;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin: 0 auto 10px;
+    position: relative;
+    z-index: 2;
+}
+
+.timeline-icon i {
+    font-size: 18px;
+}
+
+.timeline-content h6 {
+    font-size: 14px;
+    margin-bottom: 5px;
+}
+
+.timeline-content p {
+    font-size: 12px;
+}
+
+@media (max-width: 768px) {
+    .timeline-steps {
+        flex-direction: column;
+        gap: 20px;
+    }
+    
+    .timeline-step:not(:last-child)::after {
+        display: none;
+    }
+}
+</style>
+{% endblock %}

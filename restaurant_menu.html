@@ -1,0 +1,379 @@
+{% extends "base.html" %}
+
+{% block title %}{{ restaurant.name }} - Menu{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-12">
+        <!-- Restaurant Header -->
+        <div class="card mb-4">
+            <div class="card-body">
+                <div class="row align-items-center">
+                    <div class="col-md-8">
+                        <h2 class="mb-2">
+                            <i class="fas fa-utensils"></i> {{ restaurant.name }}
+                        </h2>
+                        {% if restaurant.cuisine_type %}
+                            <span class="badge bg-info mb-2">{{ restaurant.cuisine_type }}</span>
+                        {% endif %}
+                        <p class="mb-0 text-muted">
+                            <i class="fas fa-map-marker-alt"></i> 
+                            {{ restaurant.address or 'Location not specified' }}
+                        </p>
+                    </div>
+                    <div class="col-md-4 text-md-end">
+                        <a href="{{ url_for('customer_dashboard') }}" class="btn btn-outline-secondary">
+                            <i class="fas fa-arrow-left"></i> Back to Restaurants
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Menu Items -->
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0">
+                    <i class="fas fa-list"></i> Menu
+                </h5>
+            </div>
+            <div class="card-body">
+                {% if menu_items %}
+                    <div class="row">
+                        {% for item in menu_items %}
+                            <div class="col-md-6 col-lg-4 mb-4">
+                                <div class="card h-100 menu-item-card">
+                                    <div class="card-body">
+                                        <div class="d-flex justify-content-between align-items-start mb-2">
+                                            <h6 class="card-title mb-0">{{ item.name }}</h6>
+                                            <span class="badge bg-success">${{ "%.2f"|format(item.price) }}</span>
+                                        </div>
+                                        
+                                        {% if item.description %}
+                                            <p class="card-text small text-muted">{{ item.description }}</p>
+                                        {% endif %}
+                                        
+                                        <div class="d-flex justify-content-between align-items-center">
+                                            <div class="quantity-controls" style="display: none;">
+                                                <div class="input-group input-group-sm" style="width: 120px;">
+                                                    <button class="btn btn-outline-secondary btn-sm" 
+                                                            onclick="updateQuantity({{ item.id }}, -1)">-</button>
+                                                    <input type="text" class="form-control text-center" 
+                                                           id="quantity-{{ item.id }}" value="1" readonly>
+                                                    <button class="btn btn-outline-secondary btn-sm" 
+                                                            onclick="updateQuantity({{ item.id }}, 1)">+</button>
+                                                </div>
+                                            </div>
+                                            
+                                            <button class="btn btn-primary btn-sm add-to-cart-btn" 
+                                                    onclick="addToCart({{ item.id }}, '{{ item.name }}', {{ item.price }})">
+                                                <i class="fas fa-plus"></i> Add to Cart
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        {% endfor %}
+                    </div>
+                {% else %}
+                    <div class="text-center py-5">
+                        <i class="fas fa-utensils fa-3x text-muted mb-3"></i>
+                        <h5 class="text-muted">No menu items available</h5>
+                        <p class="text-muted">This restaurant hasn't added any items to their menu yet.</p>
+                    </div>
+                {% endif %}
+            </div>
+        </div>
+        
+        <!-- Floating Cart Button -->
+        <div class="position-fixed bottom-0 end-0 m-4">
+            <button class="btn btn-primary btn-lg rounded-circle" id="floating-cart-btn" 
+                    onclick="showCartModal()" style="display: none;">
+                <i class="fas fa-shopping-cart"></i>
+                <span class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger" 
+                      id="floating-cart-count">0</span>
+            </button>
+        </div>
+    </div>
+</div>
+
+<!-- Cart Modal -->
+<div class="modal fade" id="cartModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">
+                    <i class="fas fa-shopping-cart"></i> Your Cart
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body" id="cart-content">
+                <!-- Cart items will be loaded here -->
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Continue Shopping</button>
+                <button type="button" class="btn btn-primary" id="checkout-btn" onclick="checkout()">
+                    <i class="fas fa-credit-card"></i> Proceed to Checkout
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+let cart = {};
+let currentRestaurant = {{ restaurant.id }};
+
+// Load cart from localStorage
+document.addEventListener('DOMContentLoaded', function() {
+    loadCart();
+    updateCartDisplay();
+});
+
+function loadCart() {
+    const savedCart = localStorage.getItem('swiftserve_cart');
+    if (savedCart) {
+        cart = JSON.parse(savedCart);
+        // Filter cart to only show items from current restaurant
+        const filteredCart = {};
+        Object.keys(cart).forEach(itemId => {
+            // For demo, we'll assume all items are from current restaurant
+            // In a real app, you'd check the restaurant_id of each item
+            filteredCart[itemId] = cart[itemId];
+        });
+        cart = filteredCart;
+        saveCart();
+    }
+}
+
+function saveCart() {
+    localStorage.setItem('swiftserve_cart', JSON.stringify(cart));
+}
+
+function updateCartDisplay() {
+    const cartCount = Object.values(cart).reduce((sum, qty) => sum + qty, 0);
+    const floatingCartBtn = document.getElementById('floating-cart-btn');
+    const floatingCartCount = document.getElementById('floating-cart-count');
+    
+    if (cartCount > 0) {
+        floatingCartBtn.style.display = 'block';
+        floatingCartCount.textContent = cartCount;
+    } else {
+        floatingCartBtn.style.display = 'none';
+    }
+}
+
+function addToCart(itemId, itemName, itemPrice) {
+    if (cart[itemId]) {
+        cart[itemId] += 1;
+    } else {
+        cart[itemId] = 1;
+    }
+
+    // Persist the restaurant context for checkout
+    try {
+        localStorage.setItem('swiftserve_cart_restaurant', String(currentRestaurant));
+    } catch (e) {}
+
+    saveCart();
+    updateCartDisplay();
+    
+    // Show success message
+    showToast(`${itemName} added to cart!`, 'success');
+    
+    // Update button state
+    const btn = event.target;
+    btn.innerHTML = '<i class="fas fa-check"></i> Added!';
+    btn.classList.remove('btn-primary');
+    btn.classList.add('btn-success');
+    
+    setTimeout(() => {
+        btn.innerHTML = '<i class="fas fa-plus"></i> Add to Cart';
+        btn.classList.remove('btn-success');
+        btn.classList.add('btn-primary');
+    }, 2000);
+}
+
+function updateQuantity(itemId, change) {
+    if (cart[itemId]) {
+        cart[itemId] += change;
+        if (cart[itemId] <= 0) {
+            delete cart[itemId];
+        }
+        saveCart();
+        updateCartDisplay();
+        loadCartContent();
+    }
+}
+
+function removeFromCart(itemId) {
+    delete cart[itemId];
+    saveCart();
+    updateCartDisplay();
+    loadCartContent();
+}
+
+function showCartModal() {
+    loadCartContent();
+    new bootstrap.Modal(document.getElementById('cartModal')).show();
+}
+
+function loadCartContent() {
+    const cartContent = document.getElementById('cart-content');
+    
+    if (Object.keys(cart).length === 0) {
+        cartContent.innerHTML = `
+            <div class="text-center py-5">
+                <i class="fas fa-shopping-cart fa-3x text-muted mb-3"></i>
+                <h5 class="text-muted">Your cart is empty</h5>
+                <p class="text-muted">Add some delicious items from this restaurant!</p>
+            </div>
+        `;
+        return;
+    }
+    
+    // Mock menu items for demo
+    const mockItems = {
+        '1': { name: 'Classic Burger', price: 8.99 },
+        '2': { name: 'Margherita Pizza', price: 12.99 },
+        '3': { name: 'Caesar Salad', price: 6.99 },
+        '4': { name: 'French Fries', price: 3.99 },
+        '5': { name: 'Soft Drink', price: 2.99 }
+    };
+    
+    let cartHTML = '<div class="list-group">';
+    let total = 0;
+    
+    Object.keys(cart).forEach(itemId => {
+        const item = mockItems[itemId] || { name: `Menu Item ${itemId}`, price: 9.99 };
+        const quantity = cart[itemId];
+        const subtotal = item.price * quantity;
+        total += subtotal;
+        
+        cartHTML += `
+            <div class="list-group-item">
+                <div class="row align-items-center">
+                    <div class="col-md-4">
+                        <h6 class="mb-0">${item.name}</h6>
+                        <small class="text-muted">$${item.price.toFixed(2)} each</small>
+                    </div>
+                    <div class="col-md-4">
+                        <div class="input-group input-group-sm">
+                            <button class="btn btn-outline-secondary" type="button" 
+                                    onclick="updateQuantity('${itemId}', ${quantity - 1})">-</button>
+                            <input type="text" class="form-control text-center" value="${quantity}" readonly>
+                            <button class="btn btn-outline-secondary" type="button" 
+                                    onclick="updateQuantity('${itemId}', ${quantity + 1})">+</button>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <strong>$${subtotal.toFixed(2)}</strong>
+                    </div>
+                    <div class="col-md-1">
+                        <button class="btn btn-sm btn-outline-danger" onclick="removeFromCart('${itemId}')">
+                            <i class="fas fa-trash"></i>
+                        </button>
+                    </div>
+                </div>
+            </div>
+        `;
+    });
+    
+    cartHTML += '</div>';
+    cartHTML += `
+        <div class="mt-3 text-end">
+            <h5>Total: $${total.toFixed(2)}</h5>
+            <small class="text-muted">Delivery fee: $2.99</small><br>
+            <strong>Grand Total: $${(total + 2.99).toFixed(2)}</strong>
+        </div>
+    `;
+    
+    cartContent.innerHTML = cartHTML;
+}
+
+function checkout() {
+    if (Object.keys(cart).length === 0) {
+        showToast('Your cart is empty!', 'warning');
+        return;
+    }
+    
+    // Show loading state
+    const checkoutBtn = document.getElementById('checkout-btn');
+    const originalText = checkoutBtn.innerHTML;
+    checkoutBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Processing...';
+    checkoutBtn.disabled = true;
+    
+    // Simulate order placement
+    setTimeout(() => {
+        showToast('Order placed successfully!', 'success');
+        
+        // Clear cart
+        cart = {};
+        saveCart();
+        updateCartDisplay();
+        
+        // Close modal
+        bootstrap.Modal.getInstance(document.getElementById('cartModal')).hide();
+        
+        // Redirect to order tracking (mock order ID)
+        window.location.href = '/track/1';
+        
+    }, 2000);
+}
+
+function showToast(message, type = 'info') {
+    const toastHTML = `
+        <div class="toast align-items-center text-white bg-${type === 'success' ? 'success' : type === 'warning' ? 'warning' : 'info'} border-0" role="alert">
+            <div class="d-flex">
+                <div class="toast-body">
+                    ${message}
+                </div>
+                <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast"></button>
+            </div>
+        </div>
+    `;
+    
+    const toastContainer = document.createElement('div');
+    toastContainer.className = 'toast-container position-fixed top-0 end-0 p-3';
+    toastContainer.innerHTML = toastHTML;
+    document.body.appendChild(toastContainer);
+    
+    const toast = new bootstrap.Toast(toastContainer.querySelector('.toast'));
+    toast.show();
+    
+    setTimeout(() => {
+        document.body.removeChild(toastContainer);
+    }, 3000);
+}
+</script>
+{% endblock %}
+
+{% block extra_css %}
+<style>
+.menu-item-card {
+    transition: transform 0.3s ease, box-shadow 0.3s ease;
+}
+
+.menu-item-card:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 10px 25px rgba(0,0,0,0.15);
+}
+
+.quantity-controls {
+    transition: all 0.3s ease;
+}
+
+#floating-cart-btn {
+    width: 60px;
+    height: 60px;
+    font-size: 1.2rem;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+}
+
+#floating-cart-btn:hover {
+    transform: scale(1.1);
+}
+</style>
+{% endblock %}

@@ -1,0 +1,127 @@
+{% extends "base.html" %}
+
+{% block title %}Home - SwiftServe{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-lg-8 mx-auto text-center">
+        <div class="hero-section py-5">
+            <h1 class="display-4 fw-bold text-primary mb-4">
+                <i class="fas fa-shipping-fast"></i> SwiftServe
+            </h1>
+            <p class="lead mb-5">Your hyperlocal delivery platform connecting customers, restaurants, and delivery agents in real-time.</p>
+            
+            <div class="row g-4 mb-5">
+                <div class="col-md-4">
+                    <div class="card h-100 border-primary">
+                        <div class="card-body text-center">
+                            <i class="fas fa-utensils fa-3x text-primary mb-3"></i>
+                            <h5 class="card-title">For Customers</h5>
+                            <p class="card-text">Browse restaurants, order food, and track your delivery in real-time.</p>
+                            {% if not current_user.is_authenticated %}
+                                <a href="{{ url_for('register') }}?role=customer" class="btn btn-primary">Register as Customer</a>
+                            {% elif current_user.role == 'customer' %}
+                                <a href="{{ url_for('customer_dashboard') }}" class="btn btn-primary">Go to Dashboard</a>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-4">
+                    <div class="card h-100 border-success">
+                        <div class="card-body text-center">
+                            <i class="fas fa-store fa-3x text-success mb-3"></i>
+                            <h5 class="card-title">For Restaurants</h5>
+                            <p class="card-text">Manage your menu, accept orders, and grow your business.</p>
+                            {% if not current_user.is_authenticated %}
+                                <a href="{{ url_for('register') }}?role=restaurant" class="btn btn-success">Register as Restaurant</a>
+                            {% elif current_user.role == 'restaurant' %}
+                                <a href="{{ url_for('restaurant_dashboard') }}" class="btn btn-success">Go to Dashboard</a>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-4">
+                    <div class="card h-100 border-warning">
+                        <div class="card-body text-center">
+                            <i class="fas fa-motorcycle fa-3x text-warning mb-3"></i>
+                            <h5 class="card-title">For Delivery Agents</h5>
+                            <p class="card-text">Pick up and deliver orders, earn money on your schedule.</p>
+                            {% if not current_user.is_authenticated %}
+                                <a href="{{ url_for('register') }}?role=delivery_agent" class="btn btn-warning">Register as Agent</a>
+                            {% elif current_user.role == 'delivery_agent' %}
+                                <a href="{{ url_for('delivery_dashboard') }}" class="btn btn-warning">Go to Dashboard</a>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="row">
+                <div class="col-12">
+                    <h4 class="mb-4">Key Features</h4>
+                    <div class="row g-3">
+                        <div class="col-md-3">
+                            <div class="feature-box p-3 border rounded">
+                                <i class="fas fa-map-marker-alt fa-2x text-info mb-2"></i>
+                                <h6>Live Tracking</h6>
+                                <small class="text-muted">Real-time delivery tracking on map</small>
+                            </div>
+                        </div>
+                        <div class="col-md-3">
+                            <div class="feature-box p-3 border rounded">
+                                <i class="fas fa-bolt fa-2x text-warning mb-2"></i>
+                                <h6>Real-time Updates</h6>
+                                <small class="text-muted">Instant order status notifications</small>
+                            </div>
+                        </div>
+                        <div class="col-md-3">
+                            <div class="feature-box p-3 border rounded">
+                                <i class="fas fa-clock fa-2x text-success mb-2"></i>
+                                <h6>Fast Delivery</h6>
+                                <small class="text-muted">Hyperlocal delivery network</small>
+                            </div>
+                        </div>
+                        <div class="col-md-3">
+                            <div class="feature-box p-3 border rounded">
+                                <i class="fas fa-shield-alt fa-2x text-primary mb-2"></i>
+                                <h6>Secure Payments</h6>
+                                <small class="text-muted">Safe and secure transactions</small>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_css %}
+<style>
+.hero-section {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    border-radius: 15px;
+    margin-bottom: 2rem;
+}
+
+.feature-box {
+    text-align: center;
+    transition: transform 0.3s ease;
+}
+
+.feature-box:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+}
+
+.card {
+    transition: transform 0.3s ease, box-shadow 0.3s ease;
+}
+
+.card:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 10px 25px rgba(0,0,0,0.15);
+}
+</style>
+{% endblock %}

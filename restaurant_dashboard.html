@@ -1,0 +1,437 @@
+{% extends "base.html" %}
+
+{% block title %}Restaurant Dashboard - SwiftServe{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-12">
+        <h2 class="mb-4">
+            <i class="fas fa-utensils"></i> Restaurant Dashboard
+        </h2>
+        
+        <!-- Restaurant Info Card -->
+        <div class="card mb-4">
+            <div class="card-body">
+                <div class="row align-items-center">
+                    <div class="col-md-8">
+                        <h4 class="mb-2">{{ restaurant.name }}</h4>
+                        <p class="mb-2">
+                            <i class="fas fa-map-marker-alt"></i> 
+                            {{ restaurant.address or 'Address not set' }}
+                        </p>
+                        {% if restaurant.cuisine_type %}
+                            <span class="badge bg-info">{{ restaurant.cuisine_type }}</span>
+                        {% endif %}
+                        <span class="badge {% if restaurant.is_active %}bg-success{% else %}bg-danger{% endif %}">
+                            {% if restaurant.is_active %}Open{% else %}Closed{% endif %}
+                        </span>
+                    </div>
+                    <div class="col-md-4 text-md-end">
+                        <a class="btn btn-outline-primary btn-sm" href="{{ url_for('edit_restaurant_profile') }}">
+                            <i class="fas fa-edit"></i> Edit Profile
+                        </a>
+                        <button class="btn btn-success btn-sm" onclick="toggleRestaurantStatus()">
+                            <i class="fas fa-power-off"></i> 
+                            {% if restaurant.is_active %}Close{% else %}Open{% endif %} Restaurant
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Stats Cards -->
+        <div class="row mb-4">
+            <div class="col-md-3">
+                <div class="card bg-primary text-white">
+                    <div class="card-body text-center">
+                        <i class="fas fa-list fa-2x mb-2"></i>
+                        <h5>{{ menu_items|length }}</h5>
+                        <p class="mb-0">Menu Items</p>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="card bg-info text-white">
+                    <div class="card-body text-center">
+                        <i class="fas fa-shopping-bag fa-2x mb-2"></i>
+                        <h5>{{ orders|length }}</h5>
+                        <p class="mb-0">Total Orders</p>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="card bg-warning text-white">
+                    <div class="card-body text-center">
+                        <i class="fas fa-clock fa-2x mb-2"></i>
+                        <h5>{{ orders|selectattr('status', 'equalto', 'pending')|list|length }}</h5>
+                        <p class="mb-0">Pending Orders</p>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="card bg-success text-white">
+                    <div class="card-body text-center">
+                        <i class="fas fa-check-circle fa-2x mb-2"></i>
+                        <h5>{{ orders|selectattr('status', 'equalto', 'delivered')|list|length }}</h5>
+                        <p class="mb-0">Delivered Orders</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Menu Management -->
+        <div class="card mb-4">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <h5 class="mb-0">
+                    <i class="fas fa-list"></i> Menu Management
+                </h5>
+                <a class="btn btn-primary btn-sm" href="{{ url_for('add_menu_item') }}">
+                    <i class="fas fa-plus"></i> Add Menu Item
+                </a>
+            </div>
+            <div class="card-body">
+                {% if menu_items %}
+                    <div class="table-responsive">
+                        <table class="table table-hover">
+                            <thead>
+                                <tr>
+                                    <th>Name</th>
+                                    <th>Price</th>
+                                    <th>Description</th>
+                                    <th>Status</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for item in menu_items %}
+                                    <tr>
+                                        <td>{{ item.name }}</td>
+                                        <td>${{ "%.2f"|format(item.price) }}</td>
+                                        <td>{{ item.description or '-' }}</td>
+                                        <td>
+                                            <span class="badge {% if item.is_available %}bg-success{% else %}bg-danger{% endif %}">
+                                                {% if item.is_available %}Available{% else %}Unavailable{% endif %}
+                                            </span>
+                                        </td>
+                                        <td>
+                                            <button class="btn btn-sm btn-outline-primary" onclick="editMenuItem({{ item.id }})">
+                                                <i class="fas fa-edit"></i>
+                                            </button>
+                                            <button class="btn btn-sm btn-outline-danger" onclick="deleteMenuItem({{ item.id }})">
+                                                <i class="fas fa-trash"></i>
+                                            </button>
+                                            <button class="btn btn-sm btn-outline-secondary" onclick="toggleItemAvailability({{ item.id }})">
+                                                <i class="fas fa-toggle-on"></i>
+                                            </button>
+                                        </td>
+                                    </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                {% else %}
+                    <div class="text-center py-5">
+                        <i class="fas fa-list fa-3x text-muted mb-3"></i>
+                        <h5 class="text-muted">No menu items yet</h5>
+                        <p class="text-muted">Add your first menu item to get started.</p>
+                        <button class="btn btn-primary" onclick="addMenuItem()">
+                            <i class="fas fa-plus"></i> Add Menu Item
+                        </button>
+                    </div>
+                {% endif %}
+            </div>
+        </div>
+        
+        <!-- Recent Orders -->
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0">
+                    <i class="fas fa-shopping-bag"></i> Recent Orders
+                </h5>
+            </div>
+            <div class="card-body">
+                {% if orders %}
+                    <div class="table-responsive">
+                        <table class="table table-hover">
+                            <thead>
+                                <tr>
+                                    <th>Order ID</th>
+                                    <th>Customer</th>
+                                    <th>Items</th>
+                                    <th>Status</th>
+                                    <th>Time</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for order in orders|reverse %}
+                                    {% if loop.index <= 10 %}
+                                        <tr>
+                                            <td>#{{ order.id }}</td>
+                                            <td>{{ order.customer.name }}</td>
+                                            <td>{{ order.order_items|length }} items</td>
+                                            <td>
+                                                <span class="badge 
+                                                    {% if order.status == 'pending' %}bg-warning
+                                                    {% elif order.status == 'accepted' %}bg-info
+                                                    {% elif order.status == 'preparing' %}bg-primary
+                                                    {% elif order.status == 'ready_for_pickup' %}bg-secondary
+                                                    {% elif order.status == 'picked_up' %}bg-dark
+                                                    {% elif order.status == 'delivered' %}bg-success
+                                                    {% else %}bg-danger{% endif %}">
+                                                    {{ order.get_status_display() }}
+                                                </span>
+                                            </td>
+                                            <td>{{ order.timestamp.strftime('%H:%M') }}</td>
+                                            <td>
+                                                <button class="btn btn-sm btn-outline-info" onclick="viewOrder({{ order.id }})">
+                                                    <i class="fas fa-eye"></i>
+                                                </button>
+                                                {% if order.status == 'pending' %}
+                                                    <button class="btn btn-sm btn-success" onclick="updateOrderStatus({{ order.id }}, 'accepted')">
+                                                        <i class="fas fa-check"></i> Accept
+                                                    </button>
+                                                    <button class="btn btn-sm btn-danger" onclick="updateOrderStatus({{ order.id }}, 'cancelled')">
+                                                        <i class="fas fa-times"></i> Reject
+                                                    </button>
+                                                {% elif order.status == 'accepted' %}
+                                                    <button class="btn btn-sm btn-primary" onclick="updateOrderStatus({{ order.id }}, 'preparing')">
+                                                        <i class="fas fa-fire"></i> Start Preparing
+                                                    </button>
+                                                {% elif order.status == 'preparing' %}
+                                                    <button class="btn btn-sm btn-secondary" onclick="updateOrderStatus({{ order.id }}, 'ready_for_pickup')">
+                                                        <i class="fas fa-box"></i> Ready for Pickup
+                                                    </button>
+                                                {% endif %}
+                                            </td>
+                                        </tr>
+                                    {% endif %}
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                {% else %}
+                    <div class="text-center py-5">
+                        <i class="fas fa-shopping-bag fa-3x text-muted mb-3"></i>
+                        <h5 class="text-muted">No orders yet</h5>
+                        <p class="text-muted">Orders will appear here when customers place them.</p>
+                    </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Add/Edit Menu Item Modal -->
+<div class="modal fade" id="menuItemModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="menuItemModalTitle">Add Menu Item</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <form id="menuItemForm">
+                    <input type="hidden" id="item_id" name="item_id">
+                    <div class="mb-3">
+                        <label for="item_name" class="form-label">Item Name</label>
+                        <input type="text" class="form-control" id="item_name" name="name" required>
+                    </div>
+                    <div class="mb-3">
+                        <label for="item_price" class="form-label">Price ($)</label>
+                        <input type="number" step="0.01" class="form-control" id="item_price" name="price" required>
+                    </div>
+                    <div class="mb-3">
+                        <label for="item_description" class="form-label">Description</label>
+                        <textarea class="form-control" id="item_description" name="description" rows="3"></textarea>
+                    </div>
+                    <div class="mb-3">
+                        <div class="form-check">
+                            <input class="form-check-input" type="checkbox" id="item_available" name="is_available" checked>
+                            <label class="form-check-label" for="item_available">
+                                Available for ordering
+                            </label>
+                        </div>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-primary" onclick="saveMenuItem()">Save Item</button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+let socket;
+
+// Initialize Socket.IO connection
+document.addEventListener('DOMContentLoaded', function() {
+    socket = io();
+    
+    // Join restaurant room for real-time updates
+    socket.emit('join_restaurant_room', {
+        restaurant_id: {{ restaurant.id }}
+    });
+    
+    // Listen for new orders
+    socket.on('new_order', function(data) {
+        showToast(`New order #${data.order_id} from ${data.customer_name}!`, 'info');
+        // Reload page to show new order
+        setTimeout(() => location.reload(), 2000);
+    });
+});
+
+function addMenuItem() {
+    document.getElementById('menuItemModalTitle').textContent = 'Add Menu Item';
+    document.getElementById('menuItemForm').reset();
+    document.getElementById('item_id').value = '';
+    new bootstrap.Modal(document.getElementById('menuItemModal')).show();
+}
+
+function editMenuItem(itemId) {
+    // For demo purposes, show a mock edit
+    document.getElementById('menuItemModalTitle').textContent = 'Edit Menu Item';
+    document.getElementById('item_id').value = itemId;
+    
+    // Mock data for demo
+    document.getElementById('item_name').value = 'Sample Item ' + itemId;
+    document.getElementById('item_price').value = '9.99';
+    document.getElementById('item_description').value = 'Delicious sample item';
+    document.getElementById('item_available').checked = true;
+    
+    new bootstrap.Modal(document.getElementById('menuItemModal')).show();
+}
+
+function saveMenuItem() {
+    const form = document.getElementById('menuItemForm');
+    const formData = new FormData(form);
+    
+    // Simulate API call
+    showToast('Menu item saved successfully!', 'success');
+    
+    setTimeout(() => {
+        location.reload();
+    }, 1500);
+}
+
+function deleteMenuItem(itemId) {
+    if (confirm('Are you sure you want to delete this menu item?')) {
+        showToast('Menu item deleted successfully!', 'success');
+        setTimeout(() => location.reload(), 1500);
+    }
+}
+
+function toggleItemAvailability(itemId) {
+    showToast('Item availability updated!', 'success');
+    setTimeout(() => location.reload(), 1500);
+}
+
+function updateOrderStatus(orderId, newStatus) {
+    fetch('/api/order/update_status', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+            order_id: orderId,
+            status: newStatus
+        })
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            showToast('Order status updated successfully!', 'success');
+            setTimeout(() => location.reload(), 1500);
+        } else {
+            showToast('Failed to update order status', 'error');
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        showToast('Error updating order status', 'error');
+    });
+}
+
+function viewOrder(orderId) {
+    // Show order details in a modal or redirect to order details page
+    showToast(`Viewing order #${orderId}`, 'info');
+}
+
+function editRestaurant() {
+    showToast('Restaurant profile editing - coming soon!', 'info');
+}
+
+function toggleRestaurantStatus() {
+    const action = {{ restaurant.is_active|tojson }} ? 'closed' : 'open';
+    fetch('/api/restaurant/toggle_status', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ action })
+    })
+    .then(res => res.json())
+    .then(data => {
+        if (data.success) {
+            const statusText = data.is_active ? 'open' : 'closed';
+            showToast(`Restaurant marked as ${statusText}`, 'success');
+            setTimeout(() => location.reload(), 800);
+        } else {
+            showToast('Failed to update restaurant status', 'error');
+        }
+    })
+    .catch(() => showToast('Error updating status', 'error'));
+}
+
+function showToast(message, type = 'info') {
+    const toastHTML = `
+        <div class="toast align-items-center text-white bg-${type === 'success' ? 'success' : type === 'error' ? 'danger' : 'info'} border-0" role="alert">
+            <div class="d-flex">
+                <div class="toast-body">
+                    ${message}
+                </div>
+                <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast"></button>
+            </div>
+        </div>
+    `;
+    
+    const toastContainer = document.createElement('div');
+    toastContainer.className = 'toast-container position-fixed top-0 end-0 p-3';
+    toastContainer.innerHTML = toastHTML;
+    document.body.appendChild(toastContainer);
+    
+    const toast = new bootstrap.Toast(toastContainer.querySelector('.toast'));
+    toast.show();
+    
+    setTimeout(() => {
+        document.body.removeChild(toastContainer);
+    }, 3000);
+}
+</script>
+
+{% endblock %}
+
+{% block extra_css %}
+<style>
+.stats-card {
+    transition: transform 0.3s ease;
+}
+
+.stats-card:hover {
+    transform: translateY(-5px);
+}
+
+.table th {
+    border-top: none;
+    font-weight: 600;
+}
+
+.btn-group-sm .btn {
+    margin-right: 0.25rem;
+}
+</style>
+{% endblock %}

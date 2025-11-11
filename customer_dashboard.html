@@ -1,0 +1,363 @@
+{% extends "base.html" %}
+
+{% block title %}Customer Dashboard - SwiftServe{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-12">
+        <h2 class="mb-4">
+            <i class="fas fa-home"></i> Customer Dashboard
+        </h2>
+        
+        <!-- Cart Summary -->
+        <div class="card mb-4">
+            <div class="card-body">
+                <div class="row align-items-center">
+                    <div class="col-md-8">
+                        <h5 class="mb-0">
+                            <i class="fas fa-shopping-cart"></i> Your Cart
+                            <span class="badge bg-primary ms-2" id="cart-count">0</span>
+                        </h5>
+                    </div>
+                    <div class="col-md-4 text-md-end">
+                        <button class="btn btn-primary" id="view-cart-btn" type="button">
+                            <i class="fas fa-eye"></i> View Cart
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Restaurants Section -->
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0">
+                    <i class="fas fa-utensils"></i> Available Restaurants
+                </h5>
+            </div>
+            <div class="card-body">
+                {% if restaurants %}
+                    <div class="row">
+                        {% for restaurant in restaurants %}
+                            <div class="col-md-6 col-lg-4 mb-4">
+                                <div class="card h-100 restaurant-card">
+                                    <div class="card-body">
+                                        <h5 class="card-title">{{ restaurant.name }}</h5>
+                                        <p class="card-text">
+                                            <small class="text-muted">
+                                                <i class="fas fa-map-marker-alt"></i> 
+                                                {{ restaurant.address or 'Location not specified' }}
+                                            </small>
+                                        </p>
+                                        {% if restaurant.cuisine_type %}
+                                            <span class="badge bg-info mb-2">{{ restaurant.cuisine_type }}</span>
+                                        {% endif %}
+                                        
+                                        <div class="d-flex justify-content-between align-items-center">
+                                            <small class="text-muted">
+                                                <i class="fas fa-clock"></i> 30-45 min
+                                            </small>
+                                            <a href="{{ url_for('restaurant_menu', restaurant_id=restaurant.id) }}" 
+                                               class="btn btn-outline-primary btn-sm">
+                                                <i class="fas fa-eye"></i> View Menu
+                                            </a>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        {% endfor %}
+                    </div>
+                {% else %}
+                    <div class="text-center py-5">
+                        <i class="fas fa-store-slash fa-3x text-muted mb-3"></i>
+                        <h5 class="text-muted">No restaurants available</h5>
+                        <p class="text-muted">Please check back later or try a different location.</p>
+                    </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Cart Modal -->
+<div class="modal fade" id="cartModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">
+                    <i class="fas fa-shopping-cart"></i> Your Cart
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body" id="cart-content">
+                <!-- Cart items will be loaded here -->
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Continue Shopping</button>
+                <button type="button" class="btn btn-primary" id="checkout-btn">
+                    <i class="fas fa-credit-card"></i> Proceed to Checkout
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+let cart = {};
+let socket;
+
+// Initialize Socket.IO connection
+document.addEventListener('DOMContentLoaded', function() {
+    socket = io();
+    
+    // Load cart from localStorage
+    loadCart();
+    updateCartDisplay();
+    
+    // Cart button event listeners
+    document.getElementById('view-cart-btn').addEventListener('click', function() {
+        loadCartContent();
+        new bootstrap.Modal(document.getElementById('cartModal')).show();
+    });
+    
+    document.getElementById('checkout-btn').addEventListener('click', function() {
+        checkout();
+    });
+});
+
+function loadCart() {
+    const savedCart = localStorage.getItem('swiftserve_cart');
+    if (savedCart) {
+        cart = JSON.parse(savedCart);
+    }
+}
+
+function saveCart() {
+    localStorage.setItem('swiftserve_cart', JSON.stringify(cart));
+}
+
+function updateCartDisplay() {
+    const cartCount = Object.values(cart).reduce((sum, qty) => sum + qty, 0);
+    document.getElementById('cart-count').textContent = cartCount;
+}
+
+function addToCart(itemId, quantity = 1) {
+    if (cart[itemId]) {
+        cart[itemId] += quantity;
+    } else {
+        cart[itemId] = quantity;
+    }
+    
+    saveCart();
+    updateCartDisplay();
+    
+    // Show success message
+    showToast('Item added to cart!', 'success');
+}
+
+function removeFromCart(itemId) {
+    delete cart[itemId];
+    saveCart();
+    updateCartDisplay();
+    loadCartContent();
+}
+
+function updateQuantity(itemId, quantity) {
+    if (quantity <= 0) {
+        removeFromCart(itemId);
+    } else {
+        cart[itemId] = quantity;
+        saveCart();
+        updateCartDisplay();
+    }
+}
+
+function loadCartContent() {
+    const cartContent = document.getElementById('cart-content');
+    
+    if (Object.keys(cart).length === 0) {
+        cartContent.innerHTML = `
+            <div class="text-center py-5">
+                <i class="fas fa-shopping-cart fa-3x text-muted mb-3"></i>
+                <h5 class="text-muted">Your cart is empty</h5>
+                <p class="text-muted">Add some delicious items to get started!</p>
+            </div>
+        `;
+        return;
+    }
+    
+    // For demo purposes, show a simple cart
+    // In a real app, you'd fetch item details from the server
+    let cartHTML = '<div class="list-group">';
+    let total = 0;
+    
+    // Mock cart items for demo
+    const mockItems = {
+        '1': { name: 'Burger', price: 8.99 },
+        '2': { name: 'Pizza', price: 12.99 },
+        '3': { name: 'Salad', price: 6.99 }
+    };
+    
+    Object.keys(cart).forEach(itemId => {
+        const item = mockItems[itemId] || { name: `Item ${itemId}`, price: 9.99 };
+        const quantity = cart[itemId];
+        const subtotal = item.price * quantity;
+        total += subtotal;
+        
+        cartHTML += `
+            <div class="list-group-item">
+                <div class="row align-items-center">
+                    <div class="col-md-4">
+                        <h6 class="mb-0">${item.name}</h6>
+                        <small class="text-muted">$${item.price.toFixed(2)} each</small>
+                    </div>
+                    <div class="col-md-4">
+                        <div class="input-group input-group-sm">
+                            <button class="btn btn-outline-secondary" type="button" 
+                                    onclick="updateQuantity('${itemId}', ${quantity - 1})">-</button>
+                            <input type="text" class="form-control text-center" value="${quantity}" readonly>
+                            <button class="btn btn-outline-secondary" type="button" 
+                                    onclick="updateQuantity('${itemId}', ${quantity + 1})">+</button>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <strong>$${subtotal.toFixed(2)}</strong>
+                    </div>
+                    <div class="col-md-1">
+                        <button class="btn btn-sm btn-outline-danger" onclick="removeFromCart('${itemId}')">
+                            <i class="fas fa-trash"></i>
+                        </button>
+                    </div>
+                </div>
+            </div>
+        `;
+    });
+    
+    cartHTML += '</div>';
+    cartHTML += `
+        <div class="mt-3 text-end">
+            <h5>Total: $${total.toFixed(2)}</h5>
+        </div>
+    `;
+    
+    cartContent.innerHTML = cartHTML;
+}
+
+function checkout() {
+    if (Object.keys(cart).length === 0) {
+        showToast('Your cart is empty!', 'warning');
+        return;
+    }
+
+    const restaurantId = localStorage.getItem('swiftserve_cart_restaurant');
+    if (!restaurantId) {
+        showToast('Cart is missing restaurant context.', 'error');
+        return;
+    }
+
+    const modalEl = document.getElementById('cartModal');
+    const modalInstance = bootstrap.Modal.getInstance(modalEl);
+
+    // Sync local cart to server session
+    const items = Object.entries(cart).map(([itemId, qty]) => ({ itemId, qty }));
+    const addCalls = items.map(({ itemId, qty }) => {
+        return fetch('/api/cart/add', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ item_id: itemId, quantity: qty })
+        }).then(r => r.ok ? r.json() : Promise.reject(r));
+    });
+
+    Promise.all(addCalls)
+        .then(() => {
+            // Place order
+            return fetch('/api/order/place', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ restaurant_id: Number(restaurantId) })
+            });
+        })
+        .then(r => r.json())
+        .then(data => {
+            if (!data.success) {
+                showToast(data.error || 'Order placement failed', 'error');
+                return;
+            }
+
+            showToast('Order placed successfully!', 'success');
+
+            // Clear local cart
+            cart = {};
+            try {
+                localStorage.removeItem('swiftserve_cart');
+                localStorage.removeItem('swiftserve_cart_restaurant');
+            } catch (e) {}
+            saveCart();
+            updateCartDisplay();
+
+            // Close modal and redirect to tracking
+            if (modalInstance) modalInstance.hide();
+            setTimeout(() => {
+                window.location.href = `/track/${data.order_id}`;
+            }, 800);
+        })
+        .catch(() => {
+            showToast('Error during checkout. Please try again.', 'error');
+        });
+}
+
+function showToast(message, type = 'info') {
+    const toastHTML = `
+        <div class="toast align-items-center text-white bg-${type === 'success' ? 'success' : type === 'warning' ? 'warning' : 'info'} border-0" role="alert">
+            <div class="d-flex">
+                <div class="toast-body">
+                    ${message}
+                </div>
+                <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast"></button>
+            </div>
+        </div>
+    `;
+    
+    const toastContainer = document.createElement('div');
+    toastContainer.className = 'toast-container position-fixed bottom-0 end-0 p-3';
+    toastContainer.innerHTML = toastHTML;
+    document.body.appendChild(toastContainer);
+    
+    const toast = new bootstrap.Toast(toastContainer.querySelector('.toast'));
+    toast.show();
+    
+    setTimeout(() => {
+        document.body.removeChild(toastContainer);
+    }, 3000);
+}
+</script>
+{% endblock %}
+
+{% block extra_css %}
+<style>
+.restaurant-card {
+    transition: transform 0.3s ease, box-shadow 0.3s ease;
+    cursor: pointer;
+}
+
+.restaurant-card:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 10px 25px rgba(0,0,0,0.15);
+}
+
+.feature-box {
+    border: 1px solid #dee2e6;
+    border-radius: 0.5rem;
+    padding: 1rem;
+    text-align: center;
+    transition: all 0.3s ease;
+}
+
+.feature-box:hover {
+    border-color: #0d6efd;
+    background-color: #f8f9fa;
+}
+</style>
+{% endblock %}

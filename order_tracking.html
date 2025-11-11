@@ -1,0 +1,546 @@
+{% extends "base.html" %}
+
+{% block title %}Order Tracking - SwiftServe{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-12">
+        <h2 class="mb-4">
+            <i class="fas fa-map-marker-alt"></i> Order Tracking
+        </h2>
+        
+        <!-- Order Info Card -->
+        <div class="card mb-4">
+            <div class="card-body">
+                <div class="row align-items-center">
+                    <div class="col-md-8">
+                        <h5 class="mb-2">Order #{{ order.id }}</h5>
+                        <p class="mb-1">
+                            <i class="fas fa-store"></i> 
+                            <strong>{{ order.restaurant.name }}</strong>
+                        </p>
+                        <p class="mb-1">
+                            <i class="fas fa-map-marker-alt"></i> 
+                            {{ order.delivery_address }}
+                        </p>
+                        <p class="mb-0">
+                            <i class="fas fa-dollar-sign"></i> 
+                            Total: ${{ "%.2f"|format(order.total_amount|default(0, true)) }}
+                        </p>
+                    </div>
+                    <div class="col-md-4 text-md-end">
+                        <span class="badge 
+                            {% if order.status == 'pending' %}bg-warning
+                            {% elif order.status == 'accepted' %}bg-info
+                            {% elif order.status == 'preparing' %}bg-primary
+                            {% elif order.status == 'ready_for_pickup' %}bg-secondary
+                            {% elif order.status == 'picked_up' %}bg-dark
+                            {% elif order.status == 'in_transit' %}bg-info
+                            {% elif order.status == 'delivered' %}bg-success
+                            {% else %}bg-danger{% endif %} fs-6">
+                            {{ order.get_status_display() }}
+                        </span>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Progress Timeline -->
+        <div class="card mb-4">
+            <div class="card-header">
+                <h5 class="mb-0">
+                    <i class="fas fa-list"></i> Order Progress
+                </h5>
+            </div>
+            <div class="card-body">
+                <div class="timeline">
+                    <!-- Order Placed -->
+                    <div class="timeline-item {% if order.status != 'pending' %}completed{% endif %}">
+                        <div class="timeline-marker">
+                            <i class="fas fa-shopping-cart"></i>
+                        </div>
+                        <div class="timeline-content">
+                            <h6>Order Placed</h6>
+                            <p class="text-muted mb-0">Your order has been received</p>
+                            <small class="text-muted">{{ order.timestamp.strftime('%H:%M') }}</small>
+                        </div>
+                    </div>
+                    
+                    <!-- Order Accepted -->
+                    <div class="timeline-item {% if order.status in ['accepted', 'preparing', 'ready_for_pickup', 'picked_up', 'in_transit', 'delivered'] %}completed{% endif %}">
+                        <div class="timeline-marker">
+                            <i class="fas fa-check"></i>
+                        </div>
+                        <div class="timeline-content">
+                            <h6>Order Accepted</h6>
+                            <p class="text-muted mb-0">Restaurant has accepted your order</p>
+                            <small class="text-muted">{% if order.status in ['accepted', 'preparing', 'ready_for_pickup', 'picked_up', 'in_transit', 'delivered'] %}{{ order.timestamp.strftime('%H:%M') }}{% else %}Pending{% endif %}</small>
+                        </div>
+                    </div>
+                    
+                    <!-- Preparing -->
+                    <div class="timeline-item {% if order.status in ['preparing', 'ready_for_pickup', 'picked_up', 'in_transit', 'delivered'] %}completed{% endif %}">
+                        <div class="timeline-marker">
+                            <i class="fas fa-fire"></i>
+                        </div>
+                        <div class="timeline-content">
+                            <h6>Preparing</h6>
+                            <p class="text-muted mb-0">Your order is being prepared</p>
+                            <small class="text-muted">{% if order.status in ['preparing', 'ready_for_pickup', 'picked_up', 'in_transit', 'delivered'] %}{{ order.timestamp.strftime('%H:%M') }}{% else %}Pending{% endif %}</small>
+                        </div>
+                    </div>
+                    
+                    <!-- Ready for Pickup -->
+                    <div class="timeline-item {% if order.status in ['ready_for_pickup', 'picked_up', 'in_transit', 'delivered'] %}completed{% endif %}">
+                        <div class="timeline-marker">
+                            <i class="fas fa-box"></i>
+                        </div>
+                        <div class="timeline-content">
+                            <h6>Ready for Pickup</h6>
+                            <p class="text-muted mb-0">Your order is ready for pickup</p>
+                            <small class="text-muted">{% if order.status in ['ready_for_pickup', 'picked_up', 'in_transit', 'delivered'] %}{{ order.timestamp.strftime('%H:%M') }}{% else %}Pending{% endif %}</small>
+                        </div>
+                    </div>
+                    
+                    <!-- Out for Delivery -->
+                    <div class="timeline-item {% if order.status in ['picked_up', 'in_transit', 'delivered'] %}completed{% endif %}">
+                        <div class="timeline-marker">
+                            <i class="fas fa-motorcycle"></i>
+                        </div>
+                        <div class="timeline-content">
+                            <h6>Out for Delivery</h6>
+                            <p class="text-muted mb-0">Delivery agent is on the way</p>
+                            <small class="text-muted">{% if order.status in ['picked_up', 'in_transit', 'delivered'] %}{{ order.timestamp.strftime('%H:%M') }}{% else %}Pending{% endif %}</small>
+                        </div>
+                    </div>
+                    
+                    <!-- Delivered -->
+                    <div class="timeline-item {% if order.status == 'delivered' %}completed{% endif %}">
+                        <div class="timeline-marker">
+                            <i class="fas fa-home"></i>
+                        </div>
+                        <div class="timeline-content">
+                            <h6>Delivered</h6>
+                            <p class="text-muted mb-0">Your order has been delivered</p>
+                            <small class="text-muted">{% if order.status == 'delivered' %}{{ order.timestamp.strftime('%H:%M') }}{% else %}Pending{% endif %}</small>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Live Tracking Map -->
+        {% if order.status in ['picked_up', 'in_transit'] %}
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h5 class="mb-0">
+                        <i class="fas fa-map"></i> Live Delivery Tracking
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <div id="trackingMap" style="height: 400px; border-radius: 8px; border: 2px solid #dee2e6;"></div>
+                    <div class="mt-3">
+                        <div class="row">
+                            <div class="col-md-6">
+                                <h6>Delivery Agent</h6>
+                                <p class="mb-1">
+                                    <i class="fas fa-user"></i> 
+                                    <span id="agentName">{% if order.agent %}{{ order.agent.name }}{% else %}Agent assigned{% endif %}</span>
+                                </p>
+                                <p class="mb-0">
+                                    <i class="fas fa-phone"></i> 
+                                    <span id="agentPhone">{% if order.agent and order.agent.phone %}{{ order.agent.phone }}{% else %}Contact: +1-555-0123{% endif %}</span>
+                                </p>
+                            </div>
+                            <div class="col-md-6">
+                                <h6>Estimated Time</h6>
+                                <p class="mb-0">
+                                    <i class="fas fa-clock"></i> 
+                                    <strong>15-20 minutes</strong>
+                                </p>
+                                <p class="mb-0">
+                                    <small class="text-muted">Updated just now</small>
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        {% endif %}
+        
+        <!-- Order Items -->
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0">
+                    <i class="fas fa-list"></i> Order Items
+                </h5>
+            </div>
+            <div class="card-body">
+                <div class="table-responsive">
+                    <table class="table table-hover">
+                        <thead>
+                            <tr>
+                                <th>Item</th>
+                                <th>Quantity</th>
+                                <th>Price</th>
+                                <th>Total</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for item in order.order_items %}
+                                <tr>
+                                    <td>{{ item.menu_item.name }}</td>
+                                    <td>{{ item.quantity }}</td>
+                                    <td>${{ "%.2f"|format(item.price_at_order or item.menu_item.price) }}</td>
+                                    <td>${{ "%.2f"|format(item.quantity * (item.price_at_order or item.menu_item.price)) }}</td>
+                                </tr>
+                            {% endfor %}
+                        </tbody>
+                        <tfoot>
+                            <tr class="table-light">
+                                <td colspan="3" class="text-end"><strong>Total:</strong></td>
+                                <td><strong>${{ "%.2f"|format(order.total_amount|default(0, true)) }}</strong></td>
+                            </tr>
+                        </tfoot>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Back to Dashboard Button -->
+{% set dashboard_endpoint = 'customer_dashboard' if current_user.role == 'customer' else ('restaurant_dashboard' if current_user.role == 'restaurant' else 'delivery_dashboard') %}
+<div class="mt-4 text-center">
+    <a href="{{ url_for(dashboard_endpoint) }}" class="btn btn-outline-primary">
+        <i class="fas fa-arrow-left"></i> Back to Dashboard
+    </a>
+</div>
+{% endblock %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+<style>
+.timeline {
+    position: relative;
+    padding: 20px 0;
+}
+
+.timeline::before {
+    content: '';
+    position: absolute;
+    left: 30px;
+    top: 0;
+    bottom: 0;
+    width: 2px;
+    background: #e9ecef;
+}
+
+.timeline-item {
+    position: relative;
+    padding-left: 70px;
+    margin-bottom: 30px;
+}
+
+.timeline-marker {
+    position: absolute;
+    left: 20px;
+    top: 0;
+    width: 20px;
+    height: 20px;
+    background: #e9ecef;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 1;
+}
+
+.timeline-marker i {
+    font-size: 12px;
+    color: #6c757d;
+}
+
+.timeline-item.completed .timeline-marker {
+    background: #28a745;
+}
+
+.timeline-item.completed .timeline-marker i {
+    color: white;
+}
+
+.timeline-item.active .timeline-marker {
+    background: #007bff;
+    animation: pulse 2s infinite;
+}
+
+.timeline-item.active .timeline-marker i {
+    color: white;
+}
+
+@keyframes pulse {
+    0% {
+        box-shadow: 0 0 0 0 rgba(0, 123, 255, 0.7);
+    }
+    70% {
+        box-shadow: 0 0 0 10px rgba(0, 123, 255, 0);
+    }
+    100% {
+        box-shadow: 0 0 0 0 rgba(0, 123, 255, 0);
+    }
+}
+
+.timeline-content h6 {
+    margin-bottom: 5px;
+    font-weight: 600;
+}
+
+.timeline-content p {
+    margin-bottom: 2px;
+}
+
+#trackingMap {
+    border-radius: 8px;
+    border: 2px solid #dee2e6;
+}
+
+.delivery-agent-marker {
+    background: none !important;
+    border: none !important;
+}
+</style>
+{% endblock %}
+
+{% block extra_js %}
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script>
+// Store template data in JavaScript variables
+const orderData = {
+    id: {{ order.id }},
+    status: '{{ order.status }}',
+    restaurant_name: '{{ order.restaurant.name|escape }}',
+    delivery_address: '{{ order.delivery_address|escape }}',
+    agent_name: '{% if order.agent %}{{ order.agent.name|escape }}{% else %}Agent assigned{% endif %}',
+    agent_phone: '{% if order.agent and order.agent.phone %}{{ order.agent.phone|escape }}{% else %}+1-555-0123{% endif %}',
+    is_in_delivery: {% if order.status in ['picked_up', 'in_transit'] %}true{% else %}false{% endif %}
+};
+
+let socket;
+let trackingMap;
+let deliveryMarker;
+let routeLine;
+
+// Initialize Socket.IO connection
+document.addEventListener('DOMContentLoaded', function() {
+    socket = io();
+    
+    // Join order tracking room for real-time updates
+    socket.emit('join_order_tracking', {
+        order_id: orderData.id
+    });
+    
+    // Listen for order status updates
+    socket.on('order_status_updated', function(data) {
+        if (data.order_id === orderData.id) {
+            showToast(`Order status updated to ${data.status}`, 'info');
+            // Update the status badge
+            updateOrderStatus(data.status);
+            // Update the progress timeline
+            updateProgressTimeline(data.status);
+            
+            // If order is now in delivery, initialize map
+            if (data.status === 'picked_up' || data.status === 'in_transit') {
+                initializeTrackingMap();
+            }
+        }
+    });
+    
+    // Listen for delivery agent location updates
+    socket.on('delivery_agent_location', function(data) {
+        if (data.order_id === orderData.id) {
+            updateDeliveryAgentLocation(data.lat, data.lng);
+        }
+    });
+    
+    // Initialize map if order is already in delivery
+    if (orderData.is_in_delivery) {
+        setTimeout(() => {
+            initializeTrackingMap();
+        }, 1000);
+    }
+});
+
+function initializeTrackingMap() {
+    // Initialize map
+    trackingMap = L.map('trackingMap').setView([40.7128, -74.0060], 14);
+    
+    // Add tile layer
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        attribution: '© OpenStreetMap contributors'
+    }).addTo(trackingMap);
+    
+    // Mock restaurant location
+    const restaurantLocation = [40.7128, -74.0060];
+    const customerLocation = [40.7200, -74.0100];
+    
+    // Add restaurant marker
+    L.marker(restaurantLocation)
+        .addTo(trackingMap)
+        .bindPopup(`<b>Restaurant</b><br>${orderData.restaurant_name}`)
+        .openPopup();
+    
+    // Add customer marker
+    L.marker(customerLocation)
+        .addTo(trackingMap)
+        .bindPopup(`<b>Delivery Location</b><br>${orderData.delivery_address}`);
+    
+    // Add route line
+    const routeCoordinates = [restaurantLocation, customerLocation];
+    routeLine = L.polyline(routeCoordinates, {
+        color: 'blue',
+        weight: 4,
+        opacity: 0.7
+    }).addTo(trackingMap);
+    
+    // Add delivery agent marker
+    deliveryMarker = L.marker(restaurantLocation, {
+        icon: L.divIcon({
+            html: '<div style="background-color: #007bff; color: white; border-radius: 50%; width: 30px; height: 30px; display: flex; align-items: center; justify-content: center; font-size: 12px;"><i class="fas fa-motorcycle"></i></div>',
+            iconSize: [30, 30],
+            className: 'delivery-agent-marker'
+        })
+    }).addTo(trackingMap)
+    .bindPopup('<b>Delivery Agent</b><br>Your order is on the way!')
+    .openPopup();
+    
+    // Fit map to show both locations
+    const group = new L.featureGroup([
+        L.marker(restaurantLocation), 
+        L.marker(customerLocation),
+        deliveryMarker
+    ]);
+    trackingMap.fitBounds(group.getBounds().pad(0.1));
+    
+    // Simulate movement
+    simulateDeliveryMovement();
+}
+
+function simulateDeliveryMovement() {
+    if (!deliveryMarker) return;
+    
+    const route = [
+        [40.7128, -74.0060],
+        [40.7140, -74.0070],
+        [40.7150, -74.0080],
+        [40.7160, -74.0090],
+        [40.7170, -74.0095],
+        [40.7180, -74.0098],
+        [40.7190, -74.0099],
+        [40.7200, -74.0100]
+    ];
+    
+    let currentIndex = 0;
+    const moveInterval = setInterval(() => {
+        if (currentIndex < route.length) {
+            const newPosition = route[currentIndex];
+            deliveryMarker.setLatLng(newPosition);
+            
+            // Update map center to follow marker
+            if (trackingMap) {
+                trackingMap.panTo(newPosition);
+            }
+            
+            currentIndex++;
+        } else {
+            clearInterval(moveInterval);
+        }
+    }, 3000); // Move every 3 seconds
+}
+
+function updateDeliveryAgentLocation(lat, lng) {
+    if (deliveryMarker) {
+        deliveryMarker.setLatLng([lat, lng]);
+        if (trackingMap) {
+            trackingMap.panTo([lat, lng]);
+        }
+    }
+}
+
+function updateOrderStatus(status) {
+    const statusBadge = document.querySelector('.badge');
+    const statusText = status.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
+    
+    // Update badge classes
+    statusBadge.className = 'badge fs-6';
+    if (status === 'pending') statusBadge.classList.add('bg-warning');
+    else if (status === 'accepted') statusBadge.classList.add('bg-info');
+    else if (status === 'preparing') statusBadge.classList.add('bg-primary');
+    else if (status === 'ready_for_pickup') statusBadge.classList.add('bg-secondary');
+    else if (status === 'picked_up') statusBadge.classList.add('bg-dark');
+    else if (status === 'in_transit') statusBadge.classList.add('bg-info');
+    else if (status === 'delivered') statusBadge.classList.add('bg-success');
+    else statusBadge.classList.add('bg-danger');
+    
+    statusBadge.textContent = statusText;
+}
+
+function updateProgressTimeline(status) {
+    const timelineItems = document.querySelectorAll('.timeline-item');
+    
+    timelineItems.forEach((item, index) => {
+        const icon = item.querySelector('.timeline-marker i');
+        
+        // Reset all items
+        item.classList.remove('completed', 'active');
+        
+        // Update based on status
+        if (status === 'pending' && index === 0) {
+            item.classList.add('active');
+        } else if (status === 'accepted' && index <= 1) {
+            item.classList.add('completed');
+            if (index === 1) item.classList.add('active');
+        } else if (status === 'preparing' && index <= 2) {
+            item.classList.add('completed');
+            if (index === 2) item.classList.add('active');
+        } else if (status === 'ready_for_pickup' && index <= 3) {
+            item.classList.add('completed');
+            if (index === 3) item.classList.add('active');
+        } else if (status === 'picked_up' && index <= 4) {
+            item.classList.add('completed');
+            if (index === 4) item.classList.add('active');
+        } else if (status === 'in_transit' && index <= 4) {
+            item.classList.add('completed');
+            if (index === 4) item.classList.add('active');
+        } else if (status === 'delivered' && index <= 5) {
+            item.classList.add('completed');
+            if (index === 5) item.classList.add('active');
+        }
+    });
+}
+
+function showToast(message, type = 'info') {
+    const toastHTML = `
+        <div class="toast align-items-center text-white bg-${type === 'success' ? 'success' : type === 'error' ? 'danger' : 'info'} border-0" role="alert">
+            <div class="d-flex">
+                <div class="toast-body">
+                    ${message}
+                </div>
+                <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast"></button>
+            </div>
+        </div>
+    `;
+    
+    const toastContainer = document.createElement('div');
+    toastContainer.className = 'toast-container position-fixed top-0 end-0 p-3';
+    toastContainer.innerHTML = toastHTML;
+    document.body.appendChild(toastContainer);
+    
+    const toast = new bootstrap.Toast(toastContainer.querySelector('.toast'));
+    toast.show();
+    
+    setTimeout(() => {
+        document.body.removeChild(toastContainer);
+    }, 3000);
+}
+</script>
+{% endblock %}

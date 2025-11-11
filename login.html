@@ -1,0 +1,82 @@
+{% extends "base.html" %}
+
+{% block title %}Login - SwiftServe{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-md-6 col-lg-4">
+        <div class="card shadow">
+            <div class="card-body p-5">
+                <div class="text-center mb-4">
+                    <h2 class="fw-bold text-primary">
+                        <i class="fas fa-sign-in-alt"></i> Login
+                    </h2>
+                    <p class="text-muted">Welcome back to SwiftServe</p>
+                </div>
+                
+                <form method="POST" id="loginForm" action="{{ url_for('login') }}">
+                    <div class="mb-3">
+                        <label for="email" class="form-label">Email Address</label>
+                        <input type="email" class="form-control" id="email" name="email" required>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label for="password" class="form-label">Password</label>
+                        <div class="input-group">
+                            <input type="password" class="form-control" id="password" name="password" required>
+                            <button class="btn btn-outline-secondary" type="button" id="togglePassword">
+                                <i class="fas fa-eye"></i>
+                            </button>
+                        </div>
+                    </div>
+                    
+                    <div class="d-grid">
+                        <button type="submit" class="btn btn-primary btn-lg">
+                            <i class="fas fa-sign-in-alt"></i> Login
+                        </button>
+                    </div>
+                </form>
+                
+                <hr class="my-4">
+                
+                <div class="text-center">
+                    <p class="mb-0">Don't have an account?</p>
+                    <a href="{{ url_for('register') }}" class="btn btn-outline-primary btn-sm">
+                        <i class="fas fa-user-plus"></i> Register Here
+                    </a>
+                </div>
+                
+                <div class="mt-3 text-center">
+                    <small class="text-muted">
+                        Demo accounts:<br>
+                        Customer: customer@demo.com / demo123<br>
+                        Restaurant: restaurant@demo.com / demo123<br>
+                        Delivery: delivery@demo.com / demo123
+                    </small>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+document.getElementById('togglePassword').addEventListener('click', function() {
+    const passwordInput = document.getElementById('password');
+    const toggleIcon = this.querySelector('i');
+    
+    if (passwordInput.type === 'password') {
+        passwordInput.type = 'text';
+        toggleIcon.classList.remove('fa-eye');
+        toggleIcon.classList.add('fa-eye-slash');
+    } else {
+        passwordInput.type = 'password';
+        toggleIcon.classList.remove('fa-eye-slash');
+        toggleIcon.classList.add('fa-eye');
+    }
+});
+
+// Allow normal form submission so server redirects are followed
+</script>
+{% endblock %}
